@@ -1,6 +1,8 @@
 "use client";
 
+import { upload } from "@vercel/blob/client";
 import {
+  ChangeEvent,
   FormEvent,
   useEffect,
   useState,
@@ -21,6 +23,17 @@ type Lesson = {
   course: Course;
 };
 
+const MAX_VIDEO_SIZE =
+  500 * 1024 * 1024; // 500 MB
+
+const ALLOWED_VIDEO_TYPES = [
+  "video/mp4",
+  "video/webm",
+  "video/ogg",
+  "video/quicktime",
+  "video/x-m4v",
+];
+
 const initialForm = {
   title: "",
   description: "",
@@ -31,8 +44,11 @@ const initialForm = {
 };
 
 export default function LessonsManager() {
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [courses, setCourses] =
+    useState<Course[]>([]);
+
+  const [lessons, setLessons] =
+    useState<Lesson[]>([]);
 
   const [form, setForm] =
     useState(initialForm);
@@ -48,6 +64,16 @@ export default function LessonsManager() {
 
   const [videoFile, setVideoFile] =
     useState<File | null>(null);
+
+  const [
+    uploadProgress,
+    setUploadProgress,
+  ] = useState(0);
+
+  const [
+    videoInputKey,
+    setVideoInputKey,
+  ] = useState(0);
 
   async function fetchCourses() {
     try {
@@ -76,7 +102,8 @@ export default function LessonsManager() {
         ? `/api/lessons?courseId=${courseId}`
         : "/api/lessons";
 
-      const response = await fetch(url);
+      const response =
+        await fetch(url);
 
       const data =
         await response.json();
@@ -107,7 +134,7 @@ export default function LessonsManager() {
   }, []);
 
   function handleChange(
-    event: React.ChangeEvent<
+    event: ChangeEvent<
       | HTMLInputElement
       | HTMLTextAreaElement
       | HTMLSelectElement
@@ -122,6 +149,53 @@ export default function LessonsManager() {
     }));
   }
 
+  function handleVideoChange(
+    event: ChangeEvent<HTMLInputElement>
+  ) {
+    setMessage("");
+    setUploadProgress(0);
+
+    const file =
+      event.target.files?.[0];
+
+    if (!file) {
+      setVideoFile(null);
+      return;
+    }
+
+    if (
+      !ALLOWED_VIDEO_TYPES.includes(
+        file.type
+      )
+    ) {
+      setVideoFile(null);
+
+      setMessage(
+        "Invalid video format. Please upload MP4, WebM, OGG, MOV, or M4V."
+      );
+
+      event.target.value = "";
+
+      return;
+    }
+
+    if (
+      file.size > MAX_VIDEO_SIZE
+    ) {
+      setVideoFile(null);
+
+      setMessage(
+        "Video is too large. Maximum file size is 500MB."
+      );
+
+      event.target.value = "";
+
+      return;
+    }
+
+    setVideoFile(file);
+  }
+
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>
   ) {
@@ -130,42 +204,83 @@ export default function LessonsManager() {
     try {
       setLoading(true);
       setMessage("");
+      setUploadProgress(0);
 
       let videoUrl =
         form.videoUrl;
 
+      /*
+       * If the admin selected a video,
+       * upload it directly from the browser
+       * to Vercel Blob.
+       *
+       * The video does NOT pass through
+       * the Next.js API route.
+       */
       if (videoFile) {
-        const uploadData =
-          new FormData();
+        try {
+          const blob =
+            await upload(
+              `videos/${videoFile.name}`,
+              videoFile,
+              {
+                access: "private",
 
-        uploadData.append(
-          "video",
-          videoFile
-        );
+                handleUploadUrl:
+                  "/api/uploads/video",
 
-        const uploadResponse =
-          await fetch(
-            "/api/uploads/video",
-            {
-              method: "POST",
-              body: uploadData,
-            }
+                /*
+                 * Use multipart for videos
+                 * over 100 MB.
+                 *
+                 * This makes large uploads
+                 * more reliable.
+                 */
+                multipart:
+                  videoFile.size >
+                  100 *
+                    1024 *
+                    1024,
+
+                onUploadProgress: ({
+                  percentage,
+                }) => {
+                  setUploadProgress(
+                    Math.round(
+                      percentage
+                    )
+                  );
+                },
+              }
+            );
+
+          /*
+           * Save the Blob pathname
+           * in MongoDB.
+           *
+           * Example:
+           *
+           * videos/lesson-name-AbC123.mp4
+           */
+          videoUrl =
+            blob.pathname;
+
+          setUploadProgress(100);
+        } catch (uploadError) {
+          console.error(
+            "VIDEO UPLOAD ERROR:",
+            uploadError
           );
 
-        const uploadResult =
-          await uploadResponse.json();
-
-        if (!uploadResponse.ok) {
           setMessage(
-            uploadResult.message ||
-              "Video upload failed"
+            uploadError instanceof
+              Error
+              ? uploadError.message
+              : "Video upload failed"
           );
 
           return;
         }
-
-        videoUrl =
-          uploadResult.url;
       }
 
       const url = editingId
@@ -179,13 +294,17 @@ export default function LessonsManager() {
       const response =
         await fetch(url, {
           method,
+
           headers: {
             "Content-Type":
               "application/json",
           },
+
           body: JSON.stringify({
             ...form,
+
             videoUrl,
+
             order:
               Number(form.order) ||
               1,
@@ -211,12 +330,26 @@ export default function LessonsManager() {
       );
 
       setForm(initialForm);
+
       setVideoFile(null);
+
+      setUploadProgress(0);
+
       setEditingId(null);
+
+      /*
+       * Forces the file input to reset.
+       */
+      setVideoInputKey(
+        (current) => current + 1
+      );
 
       await fetchLessons();
     } catch (error) {
-      console.error(error);
+      console.error(
+        "SAVE LESSON ERROR:",
+        error
+      );
 
       setMessage(
         "Something went wrong"
@@ -233,20 +366,32 @@ export default function LessonsManager() {
 
     setForm({
       title: lesson.title,
+
       description:
         lesson.description || "",
+
       videoUrl:
         lesson.videoUrl || "",
+
       order:
         lesson.order.toString(),
+
       isPreview:
         lesson.isPreview,
+
       course:
         lesson.course._id,
     });
 
     setVideoFile(null);
+
+    setUploadProgress(0);
+
     setMessage("");
+
+    setVideoInputKey(
+      (current) => current + 1
+    );
 
     window.scrollTo({
       top: 0,
@@ -256,9 +401,18 @@ export default function LessonsManager() {
 
   function cancelEdit() {
     setEditingId(null);
+
     setForm(initialForm);
+
     setVideoFile(null);
+
+    setUploadProgress(0);
+
     setMessage("");
+
+    setVideoInputKey(
+      (current) => current + 1
+    );
   }
 
   async function handleDelete(
@@ -304,7 +458,10 @@ export default function LessonsManager() {
 
       await fetchLessons();
     } catch (error) {
-      console.error(error);
+      console.error(
+        "DELETE LESSON ERROR:",
+        error
+      );
 
       setMessage(
         "Something went wrong"
@@ -312,8 +469,18 @@ export default function LessonsManager() {
     }
   }
 
+  function formatFileSize(
+    bytes: number
+  ) {
+    const mb =
+      bytes / (1024 * 1024);
+
+    return `${mb.toFixed(1)} MB`;
+  }
+
   return (
     <div className="space-y-6">
+      {/* CREATE / EDIT LESSON */}
       <div className="rounded-2xl border bg-white p-6 shadow-sm shadow-slate-900/5 sm:p-7">
         <h2 className="mb-6 text-xl font-semibold tracking-tight text-slate-950">
           {editingId
@@ -325,13 +492,17 @@ export default function LessonsManager() {
           onSubmit={handleSubmit}
           className="space-y-4"
         >
+          {/* COURSE */}
           <select
             name="course"
             value={form.course}
             onChange={handleChange}
-            disabled={Boolean(editingId)}
+            disabled={
+              Boolean(editingId) ||
+              loading
+            }
             required
-            className="w-full rounded-lg border bg-slate-50 px-3.5 py-3 text-sm text-slate-900 hover:border-slate-400 focus:border-teal-600 focus:bg-white focus:ring-4 focus:ring-teal-100"
+            className="w-full rounded-lg border bg-slate-50 px-3.5 py-3 text-sm text-slate-900 hover:border-slate-400 focus:border-teal-600 focus:bg-white focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <option value="">
               Select course
@@ -349,16 +520,19 @@ export default function LessonsManager() {
             )}
           </select>
 
+          {/* TITLE */}
           <input
             type="text"
             name="title"
             value={form.title}
             onChange={handleChange}
             placeholder="Lesson title"
+            disabled={loading}
             required
-            className="w-full rounded-lg border bg-slate-50 px-3.5 py-3 text-sm text-slate-900 placeholder:text-slate-400 hover:border-slate-400 focus:border-teal-600 focus:bg-white focus:ring-4 focus:ring-teal-100"
+            className="w-full rounded-lg border bg-slate-50 px-3.5 py-3 text-sm text-slate-900 placeholder:text-slate-400 hover:border-slate-400 focus:border-teal-600 focus:bg-white focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-60"
           />
 
+          {/* DESCRIPTION */}
           <textarea
             name="description"
             value={
@@ -366,9 +540,11 @@ export default function LessonsManager() {
             }
             onChange={handleChange}
             placeholder="Lesson description"
-            className="min-h-28 w-full rounded-lg border bg-slate-50 px-3.5 py-3 text-sm text-slate-900 placeholder:text-slate-400 hover:border-slate-400 focus:border-teal-600 focus:bg-white focus:ring-4 focus:ring-teal-100"
+            disabled={loading}
+            className="min-h-28 w-full rounded-lg border bg-slate-50 px-3.5 py-3 text-sm text-slate-900 placeholder:text-slate-400 hover:border-slate-400 focus:border-teal-600 focus:bg-white focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-60"
           />
 
+          {/* VIDEO UPLOAD */}
           <div className="rounded-xl border border-dashed bg-slate-50/70 p-4">
             <label className="block text-sm font-medium text-slate-700">
               {editingId
@@ -377,86 +553,166 @@ export default function LessonsManager() {
             </label>
 
             <input
+              key={videoInputKey}
               type="file"
               accept="video/mp4,video/webm,video/ogg,video/quicktime,video/x-m4v"
-              onChange={(event) =>
-                setVideoFile(
-                  event.target
-                    .files?.[0] ||
-                    null
-                )
+              onChange={
+                handleVideoChange
               }
-              className="mt-2 block w-full text-sm text-slate-500 file:mr-4 file:rounded-lg file:border-0 file:bg-teal-100 file:px-4 file:py-2 file:font-semibold file:text-teal-800 hover:file:bg-teal-200"
+              disabled={loading}
+              className="mt-2 block w-full text-sm text-slate-500 file:mr-4 file:rounded-lg file:border-0 file:bg-teal-100 file:px-4 file:py-2 file:font-semibold file:text-teal-800 hover:file:bg-teal-200 disabled:cursor-not-allowed disabled:opacity-50"
             />
 
             <p className="mt-2 text-xs text-slate-500">
-              MP4, WebM, OGG,
-              MOV or M4V. Maximum
-              500MB.
+              MP4, WebM, OGG, MOV
+              or M4V. Maximum 500MB.
             </p>
 
+            {/* CURRENT VIDEO */}
             {editingId &&
               form.videoUrl &&
               !videoFile && (
-                <p className="mt-2 text-xs font-medium text-teal-700">
-                  Current video will
-                  be kept unless you
-                  upload a replacement.
-                </p>
+                <div className="mt-3 rounded-lg border border-teal-100 bg-teal-50 p-3">
+                  <p className="text-xs font-medium text-teal-800">
+                    Current video will
+                    be kept unless you
+                    upload a
+                    replacement.
+                  </p>
+
+                  <p className="mt-1 break-all text-xs text-teal-700">
+                    {form.videoUrl}
+                  </p>
+                </div>
               )}
 
+            {/* SELECTED VIDEO */}
             {videoFile && (
-              <p className="mt-2 text-xs font-medium text-slate-700">
-                Selected:{" "}
-                {videoFile.name}
-              </p>
+              <div className="mt-3 rounded-lg border bg-white p-3">
+                <p className="text-sm font-medium text-slate-800">
+                  Selected video
+                </p>
+
+                <p className="mt-1 break-all text-xs text-slate-600">
+                  {videoFile.name}
+                </p>
+
+                <p className="mt-1 text-xs text-slate-500">
+                  {formatFileSize(
+                    videoFile.size
+                  )}
+                </p>
+              </div>
             )}
+
+            {/* UPLOAD PROGRESS */}
+            {loading &&
+              videoFile &&
+              uploadProgress <
+                100 && (
+                <div className="mt-4">
+                  <div className="mb-2 flex items-center justify-between gap-4">
+                    <p className="text-xs font-medium text-slate-700">
+                      Uploading
+                      video...
+                    </p>
+
+                    <p className="text-xs font-semibold text-teal-700">
+                      {
+                        uploadProgress
+                      }
+                      %
+                    </p>
+                  </div>
+
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                    <div
+                      className="h-full rounded-full bg-teal-700 transition-all duration-200"
+                      style={{
+                        width: `${uploadProgress}%`,
+                      }}
+                    />
+                  </div>
+
+                  <p className="mt-2 text-xs text-slate-500">
+                    Keep this page open
+                    until the upload is
+                    complete.
+                  </p>
+                </div>
+              )}
+
+            {/* UPLOAD COMPLETE */}
+            {loading &&
+              videoFile &&
+              uploadProgress ===
+                100 && (
+                <p className="mt-3 text-xs font-semibold text-teal-700">
+                  Video uploaded.
+                  Saving lesson...
+                </p>
+              )}
           </div>
 
-          <input
-            type="number"
-            name="order"
-            value={form.order}
-            onChange={handleChange}
-            min="1"
-            required
-            className="w-full rounded-lg border bg-slate-50 px-3.5 py-3 text-sm text-slate-900 hover:border-slate-400 focus:border-teal-600 focus:bg-white focus:ring-4 focus:ring-teal-100"
-          />
+          {/* ORDER */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">
+              Lesson order
+            </label>
 
+            <input
+              type="number"
+              name="order"
+              value={form.order}
+              onChange={handleChange}
+              min="1"
+              disabled={loading}
+              required
+              className="w-full rounded-lg border bg-slate-50 px-3.5 py-3 text-sm text-slate-900 hover:border-slate-400 focus:border-teal-600 focus:bg-white focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-60"
+            />
+          </div>
+
+          {/* FREE PREVIEW */}
           <label className="flex items-center gap-3 text-sm font-medium text-slate-700">
             <input
               type="checkbox"
               checked={
                 form.isPreview
               }
-              onChange={(
-                event
-              ) =>
+              disabled={loading}
+              onChange={(event) =>
                 setForm(
                   (current) => ({
                     ...current,
+
                     isPreview:
                       event.target
                         .checked,
                   })
                 )
               }
+              className="h-4 w-4 accent-teal-700"
             />
 
             Free preview lesson
           </label>
 
+          {/* BUTTONS */}
           <div className="flex flex-wrap gap-3">
             <button
               type="submit"
               disabled={loading}
               className="rounded-lg bg-teal-700 px-6 py-3 text-sm font-semibold text-white shadow-sm shadow-teal-900/10 hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {loading
-                ? "Saving..."
-                : editingId
-                  ? "Update Lesson"
-                  : "Create Lesson"}
+              {loading &&
+              videoFile &&
+              uploadProgress < 100
+                ? `Uploading ${uploadProgress}%`
+                : loading
+                  ? "Saving..."
+                  : editingId
+                    ? "Update Lesson"
+                    : "Create Lesson"}
             </button>
 
             {editingId && (
@@ -465,7 +721,8 @@ export default function LessonsManager() {
                 onClick={
                   cancelEdit
                 }
-                className="rounded-lg border bg-white px-6 py-3 text-sm font-semibold text-slate-700 hover:border-slate-400 hover:bg-slate-50"
+                disabled={loading}
+                className="rounded-lg border bg-white px-6 py-3 text-sm font-semibold text-slate-700 hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -473,6 +730,7 @@ export default function LessonsManager() {
           </div>
         </form>
 
+        {/* MESSAGE */}
         {message && (
           <p className="mt-4 rounded-lg border border-teal-100 bg-teal-50 p-3 text-sm text-teal-800">
             {message}
@@ -480,6 +738,7 @@ export default function LessonsManager() {
         )}
       </div>
 
+      {/* LESSON LIST */}
       <div className="rounded-2xl border bg-white p-6 shadow-sm shadow-slate-900/5 sm:p-7">
         <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
@@ -488,15 +747,14 @@ export default function LessonsManager() {
             </h2>
 
             <p className="mt-1 text-sm text-slate-500">
-              Manage lesson
-              content and videos.
+              Manage lesson content
+              and videos.
             </p>
           </div>
 
+          {/* COURSE FILTER */}
           <select
-            onChange={(
-              event
-            ) =>
+            onChange={(event) =>
               void fetchLessons(
                 event.target
                   .value ||
@@ -524,8 +782,7 @@ export default function LessonsManager() {
 
         {lessons.length === 0 ? (
           <p className="rounded-lg border border-dashed p-6 text-center text-sm text-slate-500">
-            No lessons created
-            yet.
+            No lessons created yet.
           </p>
         ) : (
           <div className="space-y-4">
@@ -545,6 +802,7 @@ export default function LessonsManager() {
                 >
                   <div className="flex flex-col justify-between gap-4 md:flex-row">
                     <div className="min-w-0 flex-1">
+                      {/* LESSON TITLE */}
                       <h3 className="font-semibold text-slate-900">
                         {
                           lesson.order
@@ -555,6 +813,7 @@ export default function LessonsManager() {
                         }
                       </h3>
 
+                      {/* COURSE */}
                       <p className="mt-1 text-sm text-slate-500">
                         Course:{" "}
                         {
@@ -564,13 +823,14 @@ export default function LessonsManager() {
                         }
                       </p>
 
+                      {/* PREVIEW */}
                       {lesson.isPreview && (
                         <p className="mt-1 text-sm font-medium text-teal-700">
-                          Free
-                          Preview
+                          Free Preview
                         </p>
                       )}
 
+                      {/* VIDEO PLAYER */}
                       {lesson.videoUrl && (
                         <video
                           controls
@@ -582,6 +842,7 @@ export default function LessonsManager() {
                       )}
                     </div>
 
+                    {/* ACTIONS */}
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
