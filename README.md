@@ -1,4 +1,41 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## Learnspace LMS
+
+Learnspace is a full-stack learning management system built with Next.js, MongoDB, Tailwind CSS, and Stripe Checkout.
+
+### Included
+
+- Admin course, category, lesson, and user management
+- Responsive authenticated sidebar for learners and admins
+- Published course catalog and course detail pages
+- Free enrollment and paid course checkout
+- Stripe webhook activation for successful payments
+- Admin video uploads with browser streaming through HTML video controls
+
+### Setup
+
+Copy `.env.example` to `.env.local` and provide your MongoDB, auth, and Stripe values.
+
+```bash
+npm install
+npm run dev
+```
+
+For local Stripe testing, forward events to the webhook route:
+
+```bash
+stripe listen --forward-to localhost:3000/api/payments/webhook
+```
+
+Use the generated webhook signing secret as `STRIPE_WEBHOOK_SECRET`. Paid checkout requires `STRIPE_SECRET_KEY`; free courses enroll immediately without Stripe.
+
+Video uploads are stored in `public/uploads` for local development. For production deployments with ephemeral filesystems, replace the storage block in `app/api/uploads/video/route.ts` with S3, Cloudinary, or another durable object store while returning the same public URL.
+
+### Validation
+
+```bash
+npm run lint
+npm run build
+```
 
 ## Getting Started
 
