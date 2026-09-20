@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import connectDB from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/current-user";
+
 import Course from "@/models/Course";
 import Enrollment from "@/models/Enrollment";
 import Lesson from "@/models/Lesson";
@@ -62,13 +63,12 @@ export default async function AdminPage() {
   ]);
 
   const revenue =
-    revenueResult[0]?.total || 0;
+    revenueResult[0]?.total ||
+    0;
 
   return (
     <section className="animate-page-enter min-h-screen px-6 py-10 sm:px-10 sm:py-12">
       <div className="mx-auto max-w-6xl">
-
-        {/* Heading */}
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-teal-700">
             Workspace overview
@@ -79,11 +79,13 @@ export default async function AdminPage() {
           </h1>
 
           <p className="mt-2 text-sm text-slate-500">
-            Welcome back, {user.name}. Here&apos;s what&apos;s happening across Learnspace.
+            Welcome back,{" "}
+            {user.name}. Manage
+            Learnspace from one
+            place.
           </p>
         </div>
 
-        {/* Main stats */}
         <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-2xl border bg-white p-6 shadow-sm shadow-slate-900/5">
             <p className="text-sm font-medium text-slate-500">
@@ -112,7 +114,8 @@ export default async function AdminPage() {
             </p>
 
             <p className="mt-2 text-xs text-slate-400">
-              {publishedCourses} published
+              {publishedCourses}{" "}
+              published
             </p>
 
             <Link
@@ -133,7 +136,8 @@ export default async function AdminPage() {
             </p>
 
             <p className="mt-2 text-xs text-slate-400">
-              Learners with active course access
+              Current course
+              access
             </p>
           </div>
 
@@ -143,16 +147,19 @@ export default async function AdminPage() {
             </p>
 
             <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-              ${Number(revenue).toFixed(2)}
+              $
+              {Number(
+                revenue
+              ).toFixed(2)}
             </p>
 
             <p className="mt-2 text-xs text-slate-400">
-              Confirmed enrollment payments
+              Confirmed course
+              payments
             </p>
           </div>
         </div>
 
-        {/* Management area */}
         <div className="mt-6 grid gap-6 lg:grid-cols-[1.4fr_0.6fr]">
           <div className="rounded-2xl border bg-white p-6 shadow-sm shadow-slate-900/5 sm:p-7">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal-700">
@@ -160,7 +167,8 @@ export default async function AdminPage() {
             </p>
 
             <h2 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">
-              Manage your platform
+              Manage your
+              platform
             </h2>
 
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
@@ -173,7 +181,9 @@ export default async function AdminPage() {
                 </h3>
 
                 <p className="mt-2 text-sm leading-6 text-slate-500">
-                  Create, edit, publish and remove courses.
+                  Create, edit,
+                  publish and
+                  remove courses.
                 </p>
 
                 <span className="mt-4 inline-block text-sm font-semibold text-teal-700">
@@ -190,7 +200,9 @@ export default async function AdminPage() {
                 </h3>
 
                 <p className="mt-2 text-sm leading-6 text-slate-500">
-                  Manage lesson content and course videos.
+                  Manage lesson
+                  content and
+                  videos.
                 </p>
 
                 <span className="mt-4 inline-block text-sm font-semibold text-teal-700">
@@ -207,7 +219,8 @@ export default async function AdminPage() {
                 </h3>
 
                 <p className="mt-2 text-sm leading-6 text-slate-500">
-                  Organize courses into clear categories.
+                  Organize the
+                  course catalog.
                 </p>
 
                 <span className="mt-4 inline-block text-sm font-semibold text-teal-700">
@@ -224,7 +237,8 @@ export default async function AdminPage() {
                 </h3>
 
                 <p className="mt-2 text-sm leading-6 text-slate-500">
-                  Review accounts and manage access.
+                  Review accounts,
+                  roles and access.
                 </p>
 
                 <span className="mt-4 inline-block text-sm font-semibold text-teal-700">
@@ -244,7 +258,10 @@ export default async function AdminPage() {
             </p>
 
             <p className="mt-2 text-sm leading-6 text-teal-50/80">
-              Total lessons currently available across your course library.
+              Total lessons
+              currently available
+              across your course
+              library.
             </p>
 
             <Link

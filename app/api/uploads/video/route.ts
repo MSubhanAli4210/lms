@@ -4,6 +4,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import path from "node:path";
+
 import { NextResponse } from "next/server";
 
 import { getCurrentUser } from "@/lib/current-user";
@@ -37,8 +38,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const formData =
-      await request.formData();
+    const formData = await request.formData();
 
     const file = formData.get("video");
 
@@ -49,14 +49,18 @@ export async function POST(request: Request) {
       );
     }
 
-    if (
-      !file.type.startsWith("video/") ||
-      !allowedTypes.has(file.type)
-    ) {
+    if (!file.type.startsWith("video/")) {
+      return NextResponse.json(
+        { message: "Only video files are supported" },
+        { status: 400 }
+      );
+    }
+
+    if (!allowedTypes.has(file.type)) {
       return NextResponse.json(
         {
           message:
-            "Unsupported video format. Use MP4, WebM, OGG, MOV or M4V.",
+            "Unsupported video type. Use MP4, WebM, OGG, MOV or M4V.",
         },
         { status: 400 }
       );
@@ -69,14 +73,10 @@ export async function POST(request: Request) {
       );
     }
 
-    if (
-      file.size >
-      500 * 1024 * 1024
-    ) {
+    if (file.size > 500 * 1024 * 1024) {
       return NextResponse.json(
         {
-          message:
-            "Video must be smaller than 500MB",
+          message: "Video must be smaller than 500MB",
         },
         { status: 400 }
       );
@@ -88,21 +88,14 @@ export async function POST(request: Request) {
 
     if (!allowedExtensions.has(extension)) {
       return NextResponse.json(
-        {
-          message:
-            "Unsupported video extension",
-        },
+        { message: "Unsupported video extension" },
         { status: 400 }
       );
     }
 
-    const fileName =
-      `${randomUUID()}${extension}`;
+    const fileName = `${randomUUID()}${extension}`;
 
-    /*
-      IMPORTANT:
-      This is intentionally NOT inside /public.
-    */
+    // Private storage - NOT inside /public
     const uploadDirectory = path.join(
       process.cwd(),
       "storage",
@@ -118,37 +111,23 @@ export async function POST(request: Request) {
     );
 
     await writeFile(
-      path.join(
-        uploadDirectory,
-        fileName
-      ),
+      path.join(uploadDirectory, fileName),
       buffer
     );
 
-    /*
-      Store only the private storage key in MongoDB.
-      It is NOT a public URL anymore.
-    */
+    // Store only the private filename in MongoDB.
     return NextResponse.json(
       {
         success: true,
         url: fileName,
       },
-      {
-        status: 201,
-      }
+      { status: 201 }
     );
   } catch (error) {
-    console.error(
-      "VIDEO UPLOAD ERROR:",
-      error
-    );
+    console.error("VIDEO UPLOAD ERROR:", error);
 
     return NextResponse.json(
-      {
-        message:
-          "Video upload failed",
-      },
+      { message: "Video upload failed" },
       { status: 500 }
     );
   }

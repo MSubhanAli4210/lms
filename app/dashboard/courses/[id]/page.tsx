@@ -50,7 +50,8 @@ export default async function CourseDetailPage({
     status: "active",
   }).lean();
 
-  const lessons = (course.lessons || []) as unknown as CourseLesson[];
+  const lessons =
+    (course.lessons || []) as unknown as CourseLesson[];
 
   const sortedLessons = [...lessons].sort(
     (a, b) => a.order - b.order
@@ -59,11 +60,10 @@ export default async function CourseDetailPage({
   return (
     <section className="animate-page-enter min-h-screen px-6 py-12 sm:px-10">
       <div className="mx-auto max-w-5xl">
-        {/* Course header */}
         <div className="rounded-2xl bg-teal-800 p-7 text-white shadow-lg shadow-teal-900/10 sm:p-10">
           <p className="text-sm font-medium text-teal-100">
-            {course.category?.name || "Course"}{" "}
-            <span className="mx-1">·</span>
+            {course.category?.name || "Course"}
+            <span className="mx-2">·</span>
             <span className="capitalize">
               {course.level}
             </span>
@@ -86,9 +86,8 @@ export default async function CourseDetailPage({
           </div>
         </div>
 
-        {/* Lessons */}
         <div className="mt-8 rounded-2xl border bg-white p-6 shadow-sm shadow-slate-900/5 sm:p-8">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <h2 className="text-xl font-semibold text-slate-950">
                 Course lessons
@@ -113,14 +112,14 @@ export default async function CourseDetailPage({
             {sortedLessons.length ? (
               sortedLessons.map((lesson) => {
                 const unlocked =
-                  lesson.isPreview || Boolean(enrollment);
+                  lesson.isPreview ||
+                  Boolean(enrollment);
 
                 return (
                   <div
                     key={lesson._id.toString()}
                     className="flex items-start gap-4 py-5"
                   >
-                    {/* Lesson number */}
                     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-xs font-semibold text-slate-600">
                       {lesson.order}
                     </span>
@@ -150,20 +149,19 @@ export default async function CourseDetailPage({
                           : "Enroll in this course to unlock this lesson."}
                       </p>
 
-                      {/* Protected video stream */}
-                      {unlocked && lesson.videoUrl && (
-                        <div className="mt-4 overflow-hidden rounded-xl bg-slate-950">
+                      {unlocked &&
+                        lesson.videoUrl && (
                           <video
                             controls
                             controlsList="nodownload"
                             preload="metadata"
                             src={`/api/videos/${lesson._id.toString()}`}
-                            className="aspect-video w-full max-w-2xl bg-slate-950"
+                            className="mt-4 aspect-video w-full max-w-2xl rounded-xl bg-slate-950"
                           >
-                            Your browser does not support video playback.
+                            Your browser does not
+                            support video playback.
                           </video>
-                        </div>
-                      )}
+                        )}
                     </div>
                   </div>
                 );

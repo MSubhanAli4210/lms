@@ -82,13 +82,13 @@ export async function POST(request: Request) {
       );
     }
 
-    // IMPORTANT:
-    // Paid courses can ONLY be activated by Stripe webhook.
+    // Paid courses can only be activated
+    // after Stripe confirms payment.
     if (course.price > 0) {
       return NextResponse.json(
         {
           message:
-            "This is a paid course. Payment is required before enrollment.",
+            "This course requires payment before enrollment.",
         },
         { status: 403 }
       );

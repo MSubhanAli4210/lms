@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import connectDB from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/current-user";
+
 import Enrollment from "@/models/Enrollment";
 import User from "@/models/User";
 
@@ -22,15 +23,20 @@ export async function PATCH(
 
     if (
       !currentUser ||
-      currentUser.role !== "admin"
+      currentUser.role !==
+        "admin"
     ) {
       return NextResponse.json(
-        { message: "Unauthorized" },
+        {
+          message:
+            "Unauthorized",
+        },
         { status: 403 }
       );
     }
 
-    const { id } = await params;
+    const { id } =
+      await params;
 
     if (
       !mongoose.Types.ObjectId.isValid(
@@ -38,7 +44,10 @@ export async function PATCH(
       )
     ) {
       return NextResponse.json(
-        { message: "Invalid user" },
+        {
+          message:
+            "Invalid user",
+        },
         { status: 400 }
       );
     }
@@ -47,21 +56,20 @@ export async function PATCH(
       await request.json();
 
     if (
-      !["user", "admin"].includes(
-        role
-      )
+      ![
+        "user",
+        "admin",
+      ].includes(role)
     ) {
       return NextResponse.json(
-        { message: "Invalid role" },
+        {
+          message:
+            "Invalid role",
+        },
         { status: 400 }
       );
     }
 
-    /*
-      Don't allow the logged-in admin
-      to accidentally remove their own
-      admin access.
-    */
     if (
       currentUser.id === id &&
       role !== "admin"
@@ -81,7 +89,10 @@ export async function PATCH(
       await User.findByIdAndUpdate(
         id,
         { role },
-        { new: true }
+        {
+          new: true,
+          runValidators: true,
+        }
       )
         .select(
           "name email role purchasedCourses createdAt"
@@ -90,7 +101,10 @@ export async function PATCH(
 
     if (!user) {
       return NextResponse.json(
-        { message: "User not found" },
+        {
+          message:
+            "User not found",
+        },
         { status: 404 }
       );
     }
@@ -125,15 +139,20 @@ export async function DELETE(
 
     if (
       !currentUser ||
-      currentUser.role !== "admin"
+      currentUser.role !==
+        "admin"
     ) {
       return NextResponse.json(
-        { message: "Unauthorized" },
+        {
+          message:
+            "Unauthorized",
+        },
         { status: 403 }
       );
     }
 
-    const { id } = await params;
+    const { id } =
+      await params;
 
     if (
       !mongoose.Types.ObjectId.isValid(
@@ -141,12 +160,17 @@ export async function DELETE(
       )
     ) {
       return NextResponse.json(
-        { message: "Invalid user" },
+        {
+          message:
+            "Invalid user",
+        },
         { status: 400 }
       );
     }
 
-    if (currentUser.id === id) {
+    if (
+      currentUser.id === id
+    ) {
       return NextResponse.json(
         {
           message:
@@ -163,7 +187,10 @@ export async function DELETE(
 
     if (!user) {
       return NextResponse.json(
-        { message: "User not found" },
+        {
+          message:
+            "User not found",
+        },
         { status: 404 }
       );
     }
