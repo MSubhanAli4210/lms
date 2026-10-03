@@ -1,10 +1,14 @@
-FROM node:20-alpine AS base
+FROM node:20-bookworm-slim AS base
 
 FROM base AS deps
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci
+
+RUN npm ci \
+    && npm install --no-save \
+        lightningcss-linux-x64-gnu \
+        @tailwindcss/oxide-linux-x64-gnu
 
 
 FROM base AS builder
